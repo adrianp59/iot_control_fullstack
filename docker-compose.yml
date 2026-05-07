@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # MQTT broker
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto_broker
+    ports:
+      - "1883:1883"
+      - "9001:9001" # WebSockets (за бъдещо ползване в браузъра)
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    restart: always
+
+  # DB for Django
+  db:
+    image: postgres:15
+    container_name: iot_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+  # Django
+  web:
+    build: ./django_app
+    container_name: django_iot
+    # command: python manage.py runserver 0.0.0.0:8000
+    command: python -m debugpy --listen 0.0.0.0:5678 manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./django_app:/code
+    ports:
+      - "8000:8000"
+      - "5678:5678"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - MQTT_BROKER=${MQTT_BROKER}
+    depends_on:
+      - db
+      - mosquitto
+      - redis
+
+  # Script listener 
+  mqtt_worker:
+    build: ./django_app
+    container_name: django_mqtt_worker
+    command: python manage.py mqtt_listen
+    volumes:
+      - ./django_app:/code
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - MQTT_BROKER=${MQTT_BROKER}
+    depends_on:
+      - db
+      - mosquitto
+      - web
+      - redis
+    restart: always
+
+# Frontend - React
+  frontend:
+    build: ./frontend
+    container_name: react_iot
+    command: npm run dev -- --host
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Важно за Docker
+      - /app/node_modules/.vite # За Vite кеша
+    environment:
+      - CHOKIDAR_USEPOLLING=true # За автоматично обновяване в WSL2
+    stdin_open: true # За интерактивния терминал на React
+    depends_on:
+      - web
+  
+  redis:
+    image: redis:7-alpine
+    container_name: iot_redis
+
+volumes:
+  postgres_data:

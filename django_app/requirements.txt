@@ -1,0 +1,13 @@
+django
+psycopg2-binary
+paho-mqtt
+django-environ
+djangorestframework
+markdown
+django-filter>=24.2
+django-cors-headers
+djangorestframework-camel-case
+drf-spectacular
+djangorestframework-simplejwt
+debugpy
+django-redis

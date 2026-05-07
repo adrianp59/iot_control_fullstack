@@ -1,0 +1,9 @@
+# Mosquitto persistence database (runtime data)
+data/*.db
+
+# Log files
+log/*.log
+
+# Keep empty directories tracked
+!data/.gitkeep
+!log/.gitkeep

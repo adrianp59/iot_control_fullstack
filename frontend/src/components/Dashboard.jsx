@@ -4,6 +4,7 @@ import { logout } from '../api/auth';
 import { clearToken } from '../api/client';
 import TimeRangeSelector from './TimeRangeSelector';
 import SensorCard from './SensorCard';
+import ACControl from './ACControl';
 
 export default function Dashboard({ onLogout }) {
   const [sensors, setSensors] = useState([]);
@@ -11,6 +12,7 @@ export default function Dashboard({ onLogout }) {
   const [error, setError] = useState('');
   const [rangeLabel, setRangeLabel] = useState('6h');
   const [since, setSince] = useState(() => sinceFromHours(6));
+  const [activeTab, setActiveTab] = useState('sensors');
 
   useEffect(() => {
     fetchSensors()
@@ -40,22 +42,45 @@ export default function Dashboard({ onLogout }) {
         <button className="btn-logout" onClick={handleLogout}>Sign out</button>
       </header>
 
-      <div className="dashboard-toolbar">
-        <TimeRangeSelector value={rangeLabel} onChange={handleRangeChange} />
+      <div className="dashboard-tabs">
+        <button
+          className={`tab-btn${activeTab === 'sensors' ? ' active' : ''}`}
+          onClick={() => setActiveTab('sensors')}
+        >
+          Sensors
+        </button>
+        <button
+          className={`tab-btn${activeTab === 'ac-control' ? ' active' : ''}`}
+          onClick={() => setActiveTab('ac-control')}
+        >
+          AC Control
+        </button>
       </div>
 
-      {loading && <p className="dashboard-status">Loading sensors…</p>}
-      {error && <p className="dashboard-status error">{error}</p>}
+      {activeTab === 'sensors' && (
+        <>
+          <div className="dashboard-toolbar">
+            <TimeRangeSelector value={rangeLabel} onChange={handleRangeChange} />
+          </div>
 
-      {!loading && !error && sensors.length === 0 && (
-        <p className="dashboard-status">No sensors found.</p>
+          {loading && <p className="dashboard-status">Loading sensors…</p>}
+          {error && <p className="dashboard-status error">{error}</p>}
+
+          {!loading && !error && sensors.length === 0 && (
+            <p className="dashboard-status">No sensors found.</p>
+          )}
+
+          <div className="sensor-grid">
+            {sensors.map((sensor) => (
+              <SensorCard key={sensor.deviceId} sensor={sensor} since={since} />
+            ))}
+          </div>
+        </>
       )}
 
-      <div className="sensor-grid">
-        {sensors.map((sensor) => (
-          <SensorCard key={sensor.deviceId} sensor={sensor} since={since} />
-        ))}
-      </div>
+      {activeTab === 'ac-control' && (
+        <ACControl sensors={sensors} />
+      )}
     </div>
   );
 }

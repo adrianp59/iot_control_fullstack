@@ -1,4 +1,4 @@
-import os
+from django.conf import settings
 from django.core.management.base import BaseCommand
 import paho.mqtt.client as mqtt
 from sensors.models import Sensor, TemperatureReading, HumidityReading
@@ -8,8 +8,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Connection settings - using the container name from docker-compose
-        MQTT_BROKER = os.getenv('MQTT_BROKER', 'mosquitto')
-        MQTT_PORT = 1883
+        MQTT_BROKER = settings.MQTT_BROKER
+        MQTT_PORT = settings.MQTT_PORT
         MQTT_TOPIC = "home/sensors/+/temp"
         MQTT_TOPIC_HUMIDITY = "home/sensors/+/humidity"
 

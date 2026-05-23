@@ -1,8 +1,17 @@
 from rest_framework import viewsets, filters
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+
+from .utils import command_picker, send_mqtt_message
 from .models import Sensor, TemperatureReading, HumidityReading
-from .serializers import HumidityReadingSerializer, SensorSerializer, TemperatureReadingSerializer
+from .serializers import (
+    ACControlSerializer,
+    CommandSerializer, 
+    HumidityReadingSerializer, 
+    SensorSerializer, 
+    TemperatureReadingSerializer
+)
 from .filters import HumidityReadingFilter, TemperatureReadingFilter
 
 
@@ -29,7 +38,34 @@ class HumidityReadingViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-timestamp']
     
 
-class ACOffViewSet(viewsets.ViewSet):
-    def create(self, request):
+class ACControlAPIView(APIView):
+    def post(self, request):
+        device_id = request.data.get('device_id')
+        command = request.data.get('command')
+        validated_data = ACControlSerializer(data={'device_id': device_id, 'command': command})
         
-        return Response({"message": "AC unit turned off"}, status=200)
+        if validated_data.is_valid():
+            try:
+                send_mqtt_message(f"home/sensors/{device_id}/ac_control", command)
+                return Response({"status": "success", "message": f"Command '{command}' sent to device '{device_id}'"})
+            except Exception as e:
+                return Response({"status": "error", "message": str(e)}, status=500)
+        else:
+            return Response({"status": "error", "errors": validated_data.errors}, status=400)
+
+
+class ACControlV2APIView(APIView):
+    def post(self, request):
+        serializer = CommandSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            payload = dict(serializer.validated_data)
+            device_id = payload.get('device_id')
+            command = command_picker(payload)
+            try:
+                send_mqtt_message(f"home/sensors/{device_id}/ac_control", command)
+                return Response({"status": "success", "message": f"Command '{command}' sent to device '{device_id}'"})
+            except Exception as e:
+                return Response({"status": "error", "message": str(e)}, status=500)
+        else:
+            return Response({"status": "error", "errors": serializer.errors}, status=400)

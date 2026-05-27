@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .utils import command_picker, send_mqtt_message
+from .utils import command_picker, MQTTOptions
 from .models import Sensor, TemperatureReading, HumidityReading
 from .serializers import (
     ACControlSerializer,
@@ -63,8 +63,33 @@ class ACControlV2APIView(APIView):
             device_id = payload.get('device_id')
             command = command_picker(payload)
             try:
-                send_mqtt_message(f"home/sensors/{device_id}/ac_control", command)
-                return Response({"status": "success", "message": f"Command '{command}' sent to device '{device_id}'"})
+                command_topic = f"home/sensors/{device_id}/ac_control"
+                status_topic = f"home/sensors/{device_id}/status"
+
+                status_payload = MQTTOptions.send_and_wait_for_message(
+                    publish_topic=command_topic,
+                    payload=command,
+                    subscribe_topic=status_topic,
+                    timeout=5.0,
+                )
+                if status_payload == 'EXECUTED SUCCESSFULLY':
+                    return Response({
+                        "status": "success",
+                        "message": f"Command '{command}' sent to device '{device_id}' and executed successfully",
+                        "deviceStatus": status_payload,
+                    })
+                elif status_payload == 'EMPTY COMMAND':
+                    return Response({
+                        "status": "error",
+                        "message": f"Command '{command}' sent to device '{device_id}' is empty",
+                        "deviceStatus": status_payload,
+                    })
+                elif status_payload == 'UNKNOWN COMMAND':
+                    return Response({
+                        "status": "error",
+                        "message": f"Command '{command}' sent to device '{device_id}' is unknown",
+                        "deviceStatus": status_payload,
+                    })
             except Exception as e:
                 return Response({"status": "error", "message": str(e)}, status=500)
         else:

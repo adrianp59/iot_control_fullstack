@@ -1,86 +1,181 @@
 version: '3.8'
 
+networks:
+  traefik-public:
+    external: false
+  backend-private:
+    external: false
+
 services:
-  # MQTT broker
-  mosquitto:
-    image: eclipse-mosquitto:latest
-    container_name: mosquitto_broker
+  # --- 1. TRAEFIK (REVERSE PROXY, AUTOMATIC SSL & TLS) ---
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: always
     ports:
-      - "1883:1883"
-      - "9001:9001" # WebSockets (за бъдещо ползване в браузъра)
+      - "80:80"
+      - "443:443"
+      - "8883:8883"  # Сигурен MQTT (MQTTS)
+      - "9001:9001"  # Сигурен WebSockets за MQTT (WSS)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme:/letsencrypt
+    networks:
+      - traefik-public
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.mqttsecure.address=:8883"
+      - "--entrypoints.wssecure.address=:9001"
+      # Автоматично пренасочване от HTTP (80) към HTTPS (443)
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt настройки
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+
+  # --- 2. POSTGRESQL (База данни) ---
+  db:
+    image: postgres:15-alpine
+    container_name: iot_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - backend-private
+    # Проверка дали базата данни е готова да приема връзки
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- 3. REDIS (Кеш и брокер за съобщения) ---
+  redis:
+    image: redis:7-alpine
+    container_name: iot_redis
+    restart: always
+    networks:
+      - backend-private
+    # Проверка дали Redis е напълно стартирал
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- 4. MOSQUITTO (MQTT Broker) ---
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mosquitto_broker
+    restart: always
     volumes:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
-    restart: always
+    networks:
+      - traefik-public
+      - backend-private
+    labels:
+      - "traefik.enable=true"
+      
+      # Сценарий А: Сигурен TCP порт 8883 (MQTTS за Ардуиното)
+      - "traefik.tcp.routers.mosquitto.entrypoints=mqttsecure"
+      - "traefik.tcp.routers.mosquitto.rule=HostSNI(`${DOMAIN}`)"
+      - "traefik.tcp.routers.mosquitto.tls=true"
+      - "traefik.tcp.routers.mosquitto.tls.certresolver=myresolver"
+      - "traefik.tcp.routers.mosquitto.service=mosquitto-tcp-service"
+      - "traefik.tcp.services.mosquitto-tcp-service.loadbalancer.server.port=1883"
 
-  # DB for Django
-  db:
-    image: postgres:15
-    container_name: iot_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      # Сценарий Б: Сигурен WebSockets порт 9001 (WSS за браузъра)
+      - "traefik.tcp.routers.mosquitto-ws.entrypoints=wssecure"
+      - "traefik.tcp.routers.mosquitto-ws.rule=HostSNI(`${DOMAIN}`)"
+      - "traefik.tcp.routers.mosquitto-ws.tls=true"
+      - "traefik.tcp.routers.mosquitto-ws.tls.certresolver=myresolver"
+      - "traefik.tcp.routers.mosquitto-ws.service=mosquitto-ws-service"
+      - "traefik.tcp.services.mosquitto-ws-service.loadbalancer.server.port=9001"
 
-  # Django
+  # --- 5. DJANGO WEB APPLICATION (API Backend) ---
   web:
     build: ./django_app
     container_name: django_iot
-    # command: python manage.py runserver 0.0.0.0:8000
-    command: python -m debugpy --listen 0.0.0.0:5678 manage.py runserver 0.0.0.0:8000
-    volumes:
-      - ./django_app:/code
-    ports:
-      - "8000:8000"
-      - "5678:5678"
+    restart: always
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - MQTT_BROKER=${MQTT_BROKER}
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - MQTT_BROKER=mosquitto
+      - MQTT_USER=django_backend
+      - MQTT_PASS=${MQTT_DJANGO_PASS}
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - db
-      - mosquitto
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    networks:
+      - traefik-public
+      - backend-private
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
 
-  # Script listener 
+  # --- 6. DJANGO MQTT LISTENER (Worker) ---
   mqtt_worker:
     build: ./django_app
     container_name: django_mqtt_worker
-    command: python manage.py mqtt_listen
-    volumes:
-      - ./django_app:/code
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - MQTT_BROKER=${MQTT_BROKER}
-    depends_on:
-      - db
-      - mosquitto
-      - web
-      - redis
     restart: always
+    command: python manage.py mqtt_listen
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - MQTT_BROKER=mosquitto
+      - MQTT_USER=django_backend
+      - MQTT_PASS=${MQTT_DJANGO_PASS}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - backend-private  # Работи изцяло вътрешно, без излагане към Traefik/Интернет
 
-# Frontend - React
+  # --- 7. REACT CLIENT (Frontend) ---
   frontend:
     build: ./frontend
     container_name: react_iot
-    command: npm run dev -- --host
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules # Важно за Docker
-      - /app/node_modules/.vite # За Vite кеша
-    environment:
-      - CHOKIDAR_USEPOLLING=true # За автоматично обновяване в WSL2
-    stdin_open: true # За интерактивния терминал на React
+    restart: always
     depends_on:
       - web
-  
-  redis:
-    image: redis:7-alpine
-    container_name: iot_redis
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.frontend-service.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:

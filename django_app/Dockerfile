@@ -1,33 +1,42 @@
 # ==========================================
-# ЕТАП 1: Компилиране и събиране на зависимостите (Debian Bookworm / glibc)
+# ЕТАП 1: Компилиране (Builder)
 # ==========================================
-FROM astral-sh/uv:0.6-python3.14-bookworm-slim AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /app
 
-# Копиране на изискванията за проекта
+# Копиране на uv от GitHub
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
+# Копиране на зависимостите
 COPY requirements.txt .
 
-# Инсталиране на пакетите с uv директно в указана папка
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --no-cache -r requirements.txt --target /app/packages
+# ДЕВОПС СТАНДАРТ: Създаване на виртуална среда (venv) на фиксирано място
+ENV VIRTUAL_ENV=/opt/venv
+RUN uv venv $VIRTUAL_ENV
+
+# Инсталиране на пакетите директно във виртуалната среда
+# (Без --target, оставяме uv да подреди библиотеките и изпълнимите файлове правилно)
+RUN uv pip install --no-cache -r requirements.txt
 
 # ==========================================
-# ЕТАП 2: Минимален, сигурен и лек Image за изпълнение
+# ЕТАП 2: Продукция (Runner)
 # ==========================================
-FROM python:3.14.4-slim
+FROM python:3.14-slim
 WORKDIR /app
 
-# Копиране на инсталираните пакети от предходния етап (сочещи към python3.14!)
-COPY --from=builder /app/packages /usr/local/lib/python3.14/site-packages
-COPY . /app
+# Копираме цялата виртуална среда от Етап 1
+COPY --from=builder /opt/venv /opt/venv
 
-# Дефиниране на системните променливи за Python 3.14
-ENV PYTHONPATH=/usr/local/lib/python3.14/site-packages
+# АКТИВИРАНЕ: Добавяме виртуалната среда към системния път глобално
+ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
-# СИГУРНОСТ: Създаване и изпълнение като non-root потребител в Debian
+# Копираме кода на приложението
+COPY . /app
+
+# СИГУРНОСТ: Изпълнение като non-root
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Стартиране на уеб сървъра Gunicorn
+# Стартиране през Gunicorn (който вече гарантирано е в $PATH)
 CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

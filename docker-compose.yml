@@ -12,6 +12,8 @@ services:
     image: traefik:v3.0
     container_name: traefik
     restart: always
+    environment:
+      - DOCKER_API_VERSION=1.41
     ports:
       - "80:80"
       - "443:443"

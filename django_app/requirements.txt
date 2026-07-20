@@ -11,3 +11,4 @@ drf-spectacular
 djangorestframework-simplejwt
 debugpy
 django-redis
+gunicorn==22.0.0

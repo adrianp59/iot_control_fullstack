@@ -9,11 +9,9 @@ networks:
 services:
   # --- 1. TRAEFIK (REVERSE PROXY, AUTOMATIC SSL & TLS) ---
   traefik:
-    image: traefik:v3.0
+    image: traefik:v3
     container_name: traefik
     restart: always
-    environment:
-      - DOCKER_API_VERSION=1.41
     ports:
       - "80:80"
       - "443:443"

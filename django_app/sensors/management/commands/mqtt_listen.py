@@ -10,6 +10,8 @@ class Command(BaseCommand):
         # Connection settings - using the container name from docker-compose
         MQTT_BROKER = settings.MQTT_BROKER
         MQTT_PORT = settings.MQTT_PORT
+        MQTT_USER = settings.MQTT_USER
+        MQTT_PASSWORD = settings.MQTT_PASSWORD
         MQTT_TOPIC = "home/sensors/+/temp"
         MQTT_TOPIC_HUMIDITY = "home/sensors/+/humidity"
 
@@ -45,6 +47,10 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"Error saving data: {e}"))
 
         client = mqtt.Client()
+        
+        if MQTT_USER and MQTT_PASSWORD:
+            client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+            
         client.on_connect = on_connect
         client.on_message = on_message
 

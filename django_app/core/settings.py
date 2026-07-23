@@ -24,8 +24,8 @@ environ.Env.read_env(os.path.join(Path(__file__).resolve().parent.parent, '.env'
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-MQTT_BROKER = env('MQTT_BROKER')
-MQTT_PORT = env.int('MQTT_PORT')
+MQTT_BROKER = env('MQTT_BROKER', default='mosquitto')
+MQTT_PORT = env.int('MQTT_PORT', default=1883)
 MQTT_USER = env('MQTT_USER', default=None)
 MQTT_PASSWORD = env('MQTT_PASSWORD', default=None)
 

@@ -114,8 +114,9 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - SECRET_KEY=${DJANGO_SECRET_KEY}
       - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
       - MQTT_USER=django_backend
-      - MQTT_PASS=${MQTT_PASSWORD}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
@@ -148,8 +149,9 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - SECRET_KEY=${DJANGO_SECRET_KEY}
       - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
       - MQTT_USER=django_backend
-      - MQTT_PASS=${MQTT_PASSWORD}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:

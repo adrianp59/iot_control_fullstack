@@ -95,17 +95,17 @@ services:
       - "traefik.tcp.routers.mosquitto.entrypoints=mqttsecure"
       - "traefik.tcp.routers.mosquitto.rule=HostSNI(`*`)"
       - "traefik.tcp.routers.mosquitto.tls=true"
-      - "traefik.tcp.routers.mosquitto.tls.certresolver=myresolver"
+      - "traefik.tcp.routers.mosquitto.tls.passthrough=false"
       - "traefik.tcp.routers.mosquitto.service=mosquitto-tcp-service"
       - "traefik.tcp.services.mosquitto-tcp-service.loadbalancer.server.port=1883"
 
-      # Сценарий Б: Сигурен WebSockets порт 9001 (WSS за браузъра)
-      - "traefik.tcp.routers.mosquitto-ws.entrypoints=wssecure"
-      - "traefik.tcp.routers.mosquitto-ws.rule=HostSNI(`${DOMAIN}`)"
-      - "traefik.tcp.routers.mosquitto-ws.tls=true"
-      - "traefik.tcp.routers.mosquitto-ws.tls.certresolver=myresolver"
-      - "traefik.tcp.routers.mosquitto-ws.service=mosquitto-ws-service"
-      - "traefik.tcp.services.mosquitto-ws-service.loadbalancer.server.port=9001"
+      # # Сценарий Б: Сигурен WebSockets порт 9001 (WSS за браузъра)
+      # - "traefik.tcp.routers.mosquitto-ws.entrypoints=wssecure"
+      # - "traefik.tcp.routers.mosquitto-ws.rule=HostSNI(`${DOMAIN}`)"
+      # - "traefik.tcp.routers.mosquitto-ws.tls=true"
+      # - "traefik.tcp.routers.mosquitto-ws.tls.certresolver=myresolver"
+      # - "traefik.tcp.routers.mosquitto-ws.service=mosquitto-ws-service"
+      # - "traefik.tcp.services.mosquitto-ws-service.loadbalancer.server.port=9001"
 
   # --- 5. DJANGO WEB APPLICATION (API Backend) ---
   web:

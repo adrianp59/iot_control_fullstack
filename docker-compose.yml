@@ -23,6 +23,7 @@ services:
     networks:
       - traefik-public
     command:
+      - "--log.level=DEBUG"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
@@ -36,6 +37,10 @@ services:
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
       - "--certificatesresolvers.myresolver.acme.email=${SSL_EMAIL}"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    labels:
+      # Задаваме сертификата на домейна като дефолтен за всички портове
+      - "traefik.tls.stores.default.defaultgeneratedcert.resolver=myresolver"
+      - "traefik.tls.stores.default.defaultgeneratedcert.domain.main=${DOMAIN}"
 
   # --- 2. POSTGRESQL (База данни) ---
   db:
@@ -88,7 +93,7 @@ services:
       
       # Сценарий А: Сигурен TCP порт 8883 (MQTTS за Ардуиното)
       - "traefik.tcp.routers.mosquitto.entrypoints=mqttsecure"
-      - "traefik.tcp.routers.mosquitto.rule=HostSNI(`${DOMAIN}`)"
+      - "traefik.tcp.routers.mosquitto.rule=HostSNI(`*`)"
       - "traefik.tcp.routers.mosquitto.tls=true"
       - "traefik.tcp.routers.mosquitto.tls.certresolver=myresolver"
       - "traefik.tcp.routers.mosquitto.service=mosquitto-tcp-service"

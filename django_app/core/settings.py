@@ -25,7 +25,7 @@ environ.Env.read_env(os.path.join(Path(__file__).resolve().parent.parent, '.env'
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_URL = '/static/'
 # Prevent blank env values from breaking staticfiles storage in production.
-STATIC_ROOT = Path(env('STATIC_ROOT', default='') or (BASE_DIR / 'staticfiles'))
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MQTT_BROKER = env('MQTT_BROKER', default='mosquitto')
 MQTT_PORT = env.int('MQTT_PORT', default=1883)

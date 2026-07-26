@@ -118,6 +118,7 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - STATIC_ROOT=/app/staticfiles
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - MQTT_USER=django_backend
@@ -153,6 +154,7 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - STATIC_ROOT=/app/staticfiles
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
       - MQTT_USER=django_backend

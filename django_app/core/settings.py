@@ -89,8 +89,6 @@ CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
 ])
 CORS_ALLOW_CREDENTIALS = True
 
-ALLOWED_HOSTS = ['*'] # Allow all hosts for development; TODO: Adjust this for production
-
 ROOT_URLCONF = 'core.urls'
 
 TEMPLATES = [

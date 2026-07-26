@@ -13,3 +13,4 @@ debugpy
 django-redis
 gunicorn==22.0.0
 django-axes
+whitenoise

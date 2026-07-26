@@ -32,7 +32,7 @@ apiClient.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes('/api/token/')
+      !originalRequest.url?.includes('/token/')
     ) {
       originalRequest._retry = true;
 
@@ -49,7 +49,7 @@ apiClient.interceptors.response.use(
 
       try {
         const { data } = await axios.post(
-          `${BASE_URL}/api/token/refresh/`,
+          `${BASE_URL}/token/refresh/`,
           {},
           { withCredentials: true }
         );

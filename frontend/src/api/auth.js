@@ -5,7 +5,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export async function login(username, password) {
   const { data } = await axios.post(
-    `${BASE_URL}/api/token/`,
+    `${BASE_URL}/token/`,
     { username, password },
     { withCredentials: true }
   );
@@ -15,7 +15,7 @@ export async function login(username, password) {
 
 export async function refresh() {
   const { data } = await axios.post(
-    `${BASE_URL}/api/token/refresh/`,
+    `${BASE_URL}/token/refresh/`,
     {},
     { withCredentials: true }
   );
@@ -25,7 +25,7 @@ export async function refresh() {
 
 export async function logout() {
   try {
-    await apiClient.post('/api/token/blacklist/');
+    await apiClient.post('/token/blacklist/');
   } catch {
     // ignore errors — cookie will expire anyway
   } finally {

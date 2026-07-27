@@ -90,7 +90,7 @@ services:
       - backend-private
     labels:
       - "traefik.enable=true"
-      
+      - "traefik.docker.network=iot-platform_traefik-public"
       # Сценарий А: Сигурен TCP порт 8883 (MQTTS за Ардуиното)
       - "traefik.tcp.routers.mosquitto.entrypoints=mqttsecure"
       - "traefik.tcp.routers.mosquitto.rule=HostSNI(`*`)"
@@ -141,7 +141,7 @@ services:
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=myresolver"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
-      - "traefik.docker.network=traefik-public"
+      - "traefik.docker.network=iot-platform_traefik-public"
 
   # --- 6. DJANGO MQTT LISTENER (Worker) ---
   mqtt_worker:

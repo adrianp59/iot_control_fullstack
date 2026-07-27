@@ -58,7 +58,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'djangorestframework_camel_case',
     'corsheaders',
-    'axes',
+    # 'axes',
     'rest_framework_simplejwt.token_blacklist',
     'sensors',
 ]
@@ -77,7 +77,7 @@ MIDDLEWARE = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    'axes.backends.AxesBackend',
+    # 'axes.backends.AxesBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 

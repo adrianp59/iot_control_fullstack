@@ -58,7 +58,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'djangorestframework_camel_case',
     'corsheaders',
-    # 'axes',
+    'axes',
     'rest_framework_simplejwt.token_blacklist',
     'sensors',
 ]
@@ -77,14 +77,19 @@ MIDDLEWARE = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    # 'axes.backends.AxesBackend',
+    'axes.backends.AxesBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
+AXES_ENABLED = True
+AXES_META_PRECEDENCE_ORDER = [
+    'HTTP_X_FORWARDED_FOR',
+    'REMOTE_ADDR',
+]
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 1
 AXES_RESET_ON_SUCCESS = True
-AXES_IP_GET_CLIENT_IP_FIELD = 'HTTP_X_FORWARDED_FOR'
+AXES_CACHE = 'default'
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
@@ -206,10 +211,8 @@ REST_FRAMEWORK = {
     }
 }
 
-# TODO: Throttle by IP address for unauthenticated users to prevent abuse of the API.
-
 # Persists the rate limits in redis cache 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')
+REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",

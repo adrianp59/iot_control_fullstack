@@ -141,6 +141,7 @@ services:
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=myresolver"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik-public"
 
   # --- 6. DJANGO MQTT LISTENER (Worker) ---
   mqtt_worker:

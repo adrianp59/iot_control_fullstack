@@ -12,7 +12,7 @@ export async function fetchReadings(deviceId, since = null) {
   if (since) {
     params.since = since;
   }
-  const { data } = await apiClient.get('/api/readings/', { params });
+  const { data } = await apiClient.get('/readings/', { params });
   return data;
 }
 
@@ -24,6 +24,6 @@ export async function fetchHumidityReadings(deviceId, since = null) {
   if (since) {
     params.since = since;
   }
-  const { data } = await apiClient.get('/api/humidity-readings/', { params });
+  const { data } = await apiClient.get('/humidity-readings/', { params });
   return data;
 }

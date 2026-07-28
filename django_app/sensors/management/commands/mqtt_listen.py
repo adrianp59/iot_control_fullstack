@@ -14,6 +14,9 @@ class Command(BaseCommand):
         MQTT_PASSWORD = settings.MQTT_PASSWORD
         MQTT_TOPIC = "home/sensors/+/temp"
         MQTT_TOPIC_HUMIDITY = "home/sensors/+/humidity"
+        
+        self.stdout.write(f"DEBUG: Broker={MQTT_BROKER}:{MQTT_PORT}")
+        self.stdout.write(f"DEBUG: Username='{MQTT_USER}', Password='{MQTT_PASSWORD}'")
 
         def on_connect(client, userdata, flags, rc):
             self.stdout.write(self.style.SUCCESS(f"Connected to MQTT Broker with code: {rc}"))
@@ -31,25 +34,28 @@ class Command(BaseCommand):
                 
                 # Save to the database
                 sensor, created = Sensor.objects.get_or_create(device_id=device_id)
-                self.stdout.write(self.style.SUCCESS(f"Topic type: {reading_type}, value: {value}"))
+                self.stdout.write(f"Topic type: {reading_type}, value: {value}")
                 if reading_type == 'temp':
                     TemperatureReading.objects.create(sensor=sensor, value=value)
-                    self.stdout.write(self.style.SUCCESS(f"Recorded temperature: {value}°C"))
+                    self.stdout.write(f"Recorded temperature: {value}°C")
                 elif reading_type == 'humidity':
                     HumidityReading.objects.create(sensor=sensor, value=value)
-                    self.stdout.write(self.style.SUCCESS(f"Recorded humidity: {value}%"))
+                    self.stdout.write(f"Recorded humidity: {value}%")
                 else:
-                    self.stdout.write(self.style.WARNING(f"Unknown reading type: {reading_type}"))
+                    self.stdout.write(f"Unknown reading type: {reading_type}")
                     
             except ValueError:
-                self.stdout.write(self.style.ERROR(f"Invalid data format: {payload}"))
+                self.stdout.write(f"Invalid data format: {payload}")
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"Error saving data: {e}"))
+                self.stdout.write(f"Error saving data: {e}")
 
         client = mqtt.Client()
         
         if MQTT_USER and MQTT_PASSWORD:
             client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+            self.stdout.write("Credentials set successfully.")
+        else:
+            self.stdout.write("Credentials failure.")
             
         client.on_connect = on_connect
         client.on_message = on_message

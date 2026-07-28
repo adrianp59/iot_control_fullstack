@@ -142,6 +142,7 @@ services:
       - "traefik.http.routers.backend.tls.certresolver=myresolver"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
       - "traefik.docker.network=iot-platform_traefik-public"
+    command: sh -c "python manage.py collectstatic --no-input && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3"
 
   # --- 6. DJANGO MQTT LISTENER (Worker) ---
   mqtt_worker:

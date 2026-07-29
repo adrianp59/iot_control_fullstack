@@ -42,6 +42,9 @@ class MQTTOptions:
                 done.set()
 
         client = mqtt.Client()
+        if settings.MQTT_USER and settings.MQTT_PASSWORD:
+            client.username_pw_set(settings.MQTT_USER, settings.MQTT_PASSWORD)
+            
         client.on_connect = on_connect
         client.on_subscribe = on_subscribe
         client.on_message = on_message

@@ -12,8 +12,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
-import environ
 import os
+import environ
 
 env = environ.Env(
     DEBUG=(bool, False)
@@ -23,9 +23,14 @@ environ.Env.read_env(os.path.join(Path(__file__).resolve().parent.parent, '.env'
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_URL = '/static/'
+# Prevent blank env values from breaking staticfiles storage in production.
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-MQTT_BROKER = env('MQTT_BROKER')
-MQTT_PORT = env.int('MQTT_PORT')
+MQTT_BROKER = env('MQTT_BROKER', default='mosquitto')
+MQTT_PORT = env.int('MQTT_PORT', default=1883)
+MQTT_USER = env('MQTT_USER', default=None)
+MQTT_PASSWORD = env('MQTT_PASSWORD', default=None)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -38,6 +43,11 @@ DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://compiledbyadrian.com',
+    'https://www.compiledbyadrian.com',
+]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 
@@ -53,6 +63,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'djangorestframework_camel_case',
     'corsheaders',
+    'axes',
     'rest_framework_simplejwt.token_blacklist',
     'sensors',
 ]
@@ -61,13 +72,28 @@ MIDDLEWARE = [
     'core.middleware.CamelCaseQueryParamMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'axes.middleware.AxesMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+AXES_ENABLED = True
+AXES_PROXY_COUNT = 1
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1
+AXES_RESET_ON_SUCCESS = True
+AXES_CACHE = 'default'
+AXES_ENABLE_REVERSE_DNS = False
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
@@ -75,8 +101,6 @@ CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
     "http://127.0.0.1:3000",
 ])
 CORS_ALLOW_CREDENTIALS = True
-
-ALLOWED_HOSTS = ['*'] # Allow all hosts for development; TODO: Adjust this for production
 
 ROOT_URLCONF = 'core.urls'
 
@@ -101,9 +125,24 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': env.db('DATABASE_URL')
-}
+if os.getenv('DB_HOST'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME'),
+            'USER': os.getenv('DB_USER'),
+            'PASSWORD': os.getenv('DB_PASSWORD'),
+            'HOST': os.getenv('DB_HOST'),
+            'PORT': '5432',
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -140,7 +179,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
 
 REST_FRAMEWORK = {
     # 1. Convert to camelCase for JSON (Renderers & Parsers)
@@ -177,15 +215,16 @@ REST_FRAMEWORK = {
     }
 }
 
-# TODO: Throttle by IP address for unauthenticated users to prevent abuse of the API.
-
 # Persists the rate limits in redis cache 
+REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env('REDIS_URL'),
+        "LOCATION": REDIS_URL,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SOCKET_CONNECT_TIMEOUT": 3,
+            "SOCKET_TIMEOUT": 3,
         }
     }
 }

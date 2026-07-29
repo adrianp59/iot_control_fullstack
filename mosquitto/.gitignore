@@ -7,3 +7,5 @@ log/*.log
 # Keep empty directories tracked
 !data/.gitkeep
 !log/.gitkeep
+
+config/passwd

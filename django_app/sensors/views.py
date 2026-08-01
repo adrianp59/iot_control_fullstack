@@ -1,4 +1,5 @@
 import time
+import logging
 from rest_framework import viewsets, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -15,6 +16,7 @@ from .serializers import (
 )
 from .filters import HumidityReadingFilter, TemperatureReadingFilter
 
+logger = logging.getLogger(__name__)
 
 class SensorViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Sensor.objects.all().order_by('name')
@@ -75,7 +77,7 @@ class ACControlV2APIView(APIView):
                 )
                 end_time = time.time()
                 processing_time_ms = (end_time - start_time) * 1000
-                print(f"--- LATENCY TEST: Django + MQTT time: {processing_time_ms:.2f} ms ---")
+                logger.info(f"--- LATENCY TEST: Django processing: {processing_time_ms:.2f} ms ---")
                 
                 if status_payload == 'EXECUTED SUCCESSFULLY':
                     return Response({

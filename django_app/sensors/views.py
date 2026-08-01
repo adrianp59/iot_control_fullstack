@@ -1,3 +1,4 @@
+import time
 from rest_framework import viewsets, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -57,7 +58,7 @@ class ACControlAPIView(APIView):
 class ACControlV2APIView(APIView):
     def post(self, request):
         serializer = CommandSerializer(data=request.data)
-        
+        start_time = time.time()
         if serializer.is_valid():
             payload = dict(serializer.validated_data)
             device_id = payload.get('device_id')
@@ -72,6 +73,10 @@ class ACControlV2APIView(APIView):
                     subscribe_topic=status_topic,
                     timeout=5.0,
                 )
+                end_time = time.time()
+                processing_time_ms = (end_time - start_time) * 1000
+                print(f"--- LATENCY TEST: Django + MQTT time: {processing_time_ms:.2f} ms ---")
+                
                 if status_payload == 'EXECUTED SUCCESSFULLY':
                     return Response({
                         "status": "success",

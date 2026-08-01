@@ -39,4 +39,4 @@ RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Стартиране през Gunicorn (който вече гарантирано е в $PATH)
-CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-"]

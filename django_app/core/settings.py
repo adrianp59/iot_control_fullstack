@@ -234,7 +234,7 @@ REST_FRAMEWORK = {
 # Persists the rate limits in redis cache 
 REDIS_URL = os.getenv('REDIS_URL')
 if REDIS_URL:
-    # Използва се в продукция (Docker) или ако изрично е зададен REDIS_URL
+    # Used in production (Docker) or if REDIS_URL is explicitly set
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
@@ -247,7 +247,7 @@ if REDIS_URL:
         }
     }
 else:
-    # Използва се за локална разработка (runserver)
+    # Used for local development (runserver)
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",

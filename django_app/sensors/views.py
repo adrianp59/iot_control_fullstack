@@ -97,6 +97,12 @@ class ACControlV2APIView(APIView):
                         "message": f"Command '{command}' sent to device '{device_id}' is unknown",
                         "deviceStatus": status_payload,
                     })
+                else:
+                    return Response({
+                        "status": "error",
+                        "message": f"Command '{command}' sent to device '{device_id}' failed with unknown status",
+                        "deviceStatus": status_payload,
+                    })
             except Exception as e:
                 return Response({"status": "error", "message": str(e)}, status=500)
         else:

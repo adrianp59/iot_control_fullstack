@@ -71,36 +71,40 @@ class ACControlV2APIViewTests(APITestCase):
         self.user = user_model.objects.create_user(username='tester', password='secretpass123')
         self.client.force_authenticate(user=self.user)
 
-    @patch('sensors.views.send_mqtt_message')
+    @patch('sensors.utils.MQTTOptions.send_and_wait_for_message')
     def test_auto_mode_without_fan_succeeds(self, mocked_send):
+        mocked_send.return_value = "EXECUTED SUCCESSFULLY"
         response = self.client.post('/api/ac-control/v2/', {
             'deviceId': self.sensor.device_id,
             'power': 1,
             'mode': 'auto',
             'temp': 24,
         }, format='json')
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['status'], 'success')
         self.assertIn('ac_auto_p_0', response.data['message'])
         mocked_send.assert_called_once_with(
-            f'home/sensors/{self.sensor.device_id}/ac_control',
-            'ac_auto_p_0',
+            publish_topic=f'home/sensors/{self.sensor.device_id}/ac_control',
+            payload='ac_auto_p_0',
+            subscribe_topic=f'home/sensors/{self.sensor.device_id}/status',
+            timeout=5.0,
         )
 
-    @patch('sensors.views.send_mqtt_message')
+    @patch('sensors.utils.MQTTOptions.send_and_wait_for_message')
     def test_power_off_payload_succeeds(self, mocked_send):
+        mocked_send.return_value = "EXECUTED SUCCESSFULLY"
         response = self.client.post('/api/ac-control/v2/', {
             'deviceId': self.sensor.device_id,
             'power': 0,
         }, format='json')
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['status'], 'success')
         self.assertIn('ac_off', response.data['message'])
         mocked_send.assert_called_once_with(
-            f'home/sensors/{self.sensor.device_id}/ac_control',
-            'ac_off',
+            publish_topic=f'home/sensors/{self.sensor.device_id}/ac_control',
+            payload='ac_off',
+            subscribe_topic=f'home/sensors/{self.sensor.device_id}/status',
+            timeout=5.0,
         )
 
     def test_missing_temp_returns_validation_error(self):
@@ -114,3 +118,15 @@ class ACControlV2APIViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['status'], 'error')
         self.assertIn('temp', response.data['errors'])
+
+    def test_missing_mode_returns_validation_error(self):
+        response = self.client.post('/api/ac-control/v2/', {
+            'deviceId': self.sensor.device_id,
+            'power': 1,
+            'temp': 24,
+            'fan': 'high',
+        }, format='json')
+        print(response.content)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['status'], 'error')
+        self.assertIn('mode', response.data['errors'])

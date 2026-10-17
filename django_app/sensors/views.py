@@ -5,7 +5,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .utils import command_picker, MQTTOptions
+from .services.command_utils import command_picker
+from .services.mqtt_msg_utils import MQTTOptions
 from .models import Sensor, TemperatureReading, HumidityReading
 from .serializers import (
     ACControlSerializer,
@@ -49,7 +50,7 @@ class ACControlAPIView(APIView):
         
         if validated_data.is_valid():
             try:
-                send_mqtt_message(f"home/sensors/{device_id}/ac_control", command)
+                MQTTOptions.send_mqtt_message(f"home/sensors/{device_id}/ac_control", command)
                 return Response({"status": "success", "message": f"Command '{command}' sent to device '{device_id}'"})
             except Exception as e:
                 return Response({"status": "error", "message": str(e)}, status=500)

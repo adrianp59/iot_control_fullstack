@@ -18,7 +18,6 @@ import environ
 env = environ.Env(
     DEBUG=(bool, False)
 )
-
 environ.Env.read_env(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -32,6 +31,7 @@ MQTT_PORT = env.int('MQTT_PORT', default=1883)
 MQTT_USER = env('MQTT_USER', default=None)
 MQTT_PASSWORD = env('MQTT_PASSWORD', default=None)
 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -40,13 +40,9 @@ SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
-
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://compiledbyadrian.com',
-    'https://www.compiledbyadrian.com',
-]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
@@ -236,18 +232,28 @@ REST_FRAMEWORK = {
 }
 
 # Persists the rate limits in redis cache 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_URL,
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "SOCKET_CONNECT_TIMEOUT": 3,
-            "SOCKET_TIMEOUT": 3,
+REDIS_URL = os.getenv('REDIS_URL')
+if REDIS_URL:
+    # Използва се в продукция (Docker) или ако изрично е зададен REDIS_URL
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "SOCKET_CONNECT_TIMEOUT": 3,
+                "SOCKET_TIMEOUT": 3,
+            }
         }
     }
-}
+else:
+    # Използва се за локална разработка (runserver)
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+        }
+    }
 
 # Settings for drf-spectacular (OpenAPI)
 SPECTACULAR_SETTINGS = {

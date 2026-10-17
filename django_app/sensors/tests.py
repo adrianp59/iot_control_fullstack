@@ -71,7 +71,7 @@ class ACControlV2APIViewTests(APITestCase):
         self.user = user_model.objects.create_user(username='tester', password='secretpass123')
         self.client.force_authenticate(user=self.user)
 
-    @patch('sensors.utils.MQTTOptions.send_and_wait_for_message')
+    @patch('sensors.services.mqtt_msg_utils.MQTTOptions.send_and_wait_for_message')
     def test_auto_mode_without_fan_succeeds(self, mocked_send):
         mocked_send.return_value = "EXECUTED SUCCESSFULLY"
         response = self.client.post('/api/ac-control/v2/', {
@@ -90,7 +90,7 @@ class ACControlV2APIViewTests(APITestCase):
             timeout=5.0,
         )
 
-    @patch('sensors.utils.MQTTOptions.send_and_wait_for_message')
+    @patch('sensors.services.mqtt_msg_utils.MQTTOptions.send_and_wait_for_message')
     def test_power_off_payload_succeeds(self, mocked_send):
         mocked_send.return_value = "EXECUTED SUCCESSFULLY"
         response = self.client.post('/api/ac-control/v2/', {

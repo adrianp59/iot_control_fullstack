@@ -15,8 +15,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8883:8883"  # Сигурен MQTT (MQTTS)
-      - "9001:9001"  # Сигурен WebSockets за MQTT (WSS)
+      - "8883:8883"  # Secure MQTT (MQTTS)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/acme:/letsencrypt
@@ -30,15 +29,15 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.mqttsecure.address=:8883"
       - "--entrypoints.wssecure.address=:9001"
-      # Автоматично пренасочване от HTTP (80) към HTTPS (443)
+      # Automatic redirection from HTTP (80) to  HTTPS (443)
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # Let's Encrypt настройки
+      # Let's Encrypt settings
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
       - "--certificatesresolvers.myresolver.acme.email=${SSL_EMAIL}"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     labels:
-      # Задаваме сертификата на домейна като дефолтен за всички портове
+      # Set the domain certificate as the default for all ports
       - "traefik.tls.stores.default.defaultgeneratedcert.resolver=myresolver"
       - "traefik.tls.stores.default.defaultgeneratedcert.domain.main=${DOMAIN}"
 
@@ -55,7 +54,7 @@ services:
       - postgres_data:/var/lib/postgresql/data/
     networks:
       - backend-private
-    # Проверка дали базата данни е готова да приема връзки
+    # Check if the database is ready to accept connections
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
@@ -69,7 +68,7 @@ services:
     restart: always
     networks:
       - backend-private
-    # Проверка дали Redis е напълно стартирал
+    # Check if Redis has fully started
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -91,21 +90,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=iot-platform_traefik-public"
-      # Сценарий А: Сигурен TCP порт 8883 (MQTTS за Ардуиното)
+      # Secure TCP port 8883 (MQTTS for Arduino)
       - "traefik.tcp.routers.mosquitto.entrypoints=mqttsecure"
       - "traefik.tcp.routers.mosquitto.rule=HostSNI(`*`)"
       - "traefik.tcp.routers.mosquitto.tls=true"
       - "traefik.tcp.routers.mosquitto.tls.passthrough=false"
       - "traefik.tcp.routers.mosquitto.service=mosquitto-tcp-service"
       - "traefik.tcp.services.mosquitto-tcp-service.loadbalancer.server.port=1883"
-
-      # # Сценарий Б: Сигурен WebSockets порт 9001 (WSS за браузъра)
-      # - "traefik.tcp.routers.mosquitto-ws.entrypoints=wssecure"
-      # - "traefik.tcp.routers.mosquitto-ws.rule=HostSNI(`${DOMAIN}`)"
-      # - "traefik.tcp.routers.mosquitto-ws.tls=true"
-      # - "traefik.tcp.routers.mosquitto-ws.tls.certresolver=myresolver"
-      # - "traefik.tcp.routers.mosquitto-ws.service=mosquitto-ws-service"
-      # - "traefik.tcp.services.mosquitto-ws-service.loadbalancer.server.port=9001"
 
   # --- 5. DJANGO WEB APPLICATION (API Backend) ---
   web:
@@ -170,7 +161,7 @@ services:
       web:
         condition: service_started
     networks:
-      - backend-private  # Работи изцяло вътрешно, без излагане към Traefik/Интернет
+      - backend-private  # Internal network only, not exposed to Traefik/Internet
 
   # --- 7. REACT CLIENT (Frontend) ---
   frontend:

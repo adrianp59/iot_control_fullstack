@@ -1,0 +1,184 @@
+version: '3.8'
+
+networks:
+  traefik-public:
+    external: false
+  backend-private:
+    external: false
+
+services:
+  # --- 1. TRAEFIK (REVERSE PROXY, AUTOMATIC SSL & TLS) ---
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8883:8883"  # Secure MQTT (MQTTS)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme:/letsencrypt
+    networks:
+      - traefik-public
+    command:
+      - "--log.level=DEBUG"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.mqttsecure.address=:8883"
+      - "--entrypoints.wssecure.address=:9001"
+      # Automatic redirection from HTTP (80) to  HTTPS (443)
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt settings
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    labels:
+      # Set the domain certificate as the default for all ports
+      - "traefik.tls.stores.default.defaultgeneratedcert.resolver=myresolver"
+      - "traefik.tls.stores.default.defaultgeneratedcert.domain.main=${DOMAIN}"
+
+  # --- 2. POSTGRESQL (Database) ---
+  db:
+    image: postgres:15-alpine
+    container_name: iot_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - backend-private
+    # Check if the database is ready to accept connections
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- 3. REDIS ---
+  redis:
+    image: redis:7-alpine
+    container_name: iot_redis
+    restart: always
+    networks:
+      - backend-private
+    # Check if Redis has fully started
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- 4. MOSQUITTO (MQTT Broker) ---
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mosquitto_broker
+    restart: always
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - traefik-public
+      - backend-private
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=iot-platform_traefik-public"
+      # Secure TCP port 8883 (MQTTS for Arduino)
+      - "traefik.tcp.routers.mosquitto.entrypoints=mqttsecure"
+      - "traefik.tcp.routers.mosquitto.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.mosquitto.tls=true"
+      - "traefik.tcp.routers.mosquitto.tls.passthrough=false"
+      - "traefik.tcp.routers.mosquitto.service=mosquitto-tcp-service"
+      - "traefik.tcp.services.mosquitto-tcp-service.loadbalancer.server.port=1883"
+
+  # --- 5. DJANGO WEB APPLICATION (API Backend) ---
+  web:
+    build: ./django_app
+    container_name: django_iot
+    restart: always
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - STATIC_ROOT=/app/staticfiles
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_USER=django_backend
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    networks:
+      - traefik-public
+      - backend-private
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/secret-management-portal-99`) || PathPrefix(`/static`))"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      - "traefik.docker.network=iot-platform_traefik-public"
+    command: sh -c "python manage.py collectstatic --no-input && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+
+  # --- 6. DJANGO MQTT LISTENER (Worker) ---
+  mqtt_worker:
+    build: ./django_app
+    container_name: django_mqtt_worker
+    restart: always
+    command: python manage.py mqtt_listen
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - STATIC_ROOT=/app/staticfiles
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_USER=django_backend
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - backend-private  # Internal network only, not exposed to Traefik/Internet
+
+  # --- 7. REACT CLIENT (Frontend) ---
+  frontend:
+    build: ./frontend
+    container_name: react_iot
+    restart: always
+    depends_on:
+      - web
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+volumes:
+  postgres_data:
